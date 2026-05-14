@@ -1,57 +1,84 @@
-import os
+from ddgs import DDGS
 import requests
+import os
+import time
+import hashlib
+from PIL import Image
+from io import BytesIO
 
-from duckduckgo_search import DDGS
+query = "BMW 3 series sedan e30"
+folder = "dataset_raw/e30"
 
+os.makedirs(folder, exist_ok=True)
 
-QUERY = "BMW E46 sedan"
+seen_hashes = set()
 
-SAVE_FOLDER = "dataset/e46"
+#простые "car-фильтры" через ключевые слова в URL/метаданных
+CAR_HINTS = ["car", "bmw", "vehicle", "auto", "sedan", "road"]
 
-MAX_IMAGES = 100
+def is_probably_car(url):
+    url = url.lower()
+    return any(hint in url for hint in CAR_HINTS)
 
-os.makedirs(SAVE_FOLDER, exist_ok=True)
-
-
-def download_image(url, path):
-
+def is_good_image(image_bytes):
     try:
+        img = Image.open(BytesIO(image_bytes))
+        img = img.convert("RGB")
 
-        response = requests.get(url, timeout=10)
+        w, h = img.size
 
-        if response.status_code == 200:
+        # слишком маленькие изображения
+        if w < 200 or h < 200:
+            return False
 
-            with open(path, "wb") as f:
-                f.write(response.content)
+        # слишком “узкие” (часто логотипы/иконки)
+        if w / h > 4 or h / w > 4:
+            return False
 
-            return True
+        return True
 
     except:
         return False
 
 
 with DDGS() as ddgs:
+    results = ddgs.images(query, max_results=300)
 
-    results = ddgs.images(
-        QUERY,
-        max_results=MAX_IMAGES
-    )
+    i = 0
+    for r in results:
+        try:
+            url = r["image"]
 
-    for i, result in enumerate(results):
+            # грубый фильтр по ссылке
+            if not is_probably_car(url):
+                continue
 
-        image_url = result["image"]
+            time.sleep(0.25)
 
-        file_path = os.path.join(
-            SAVE_FOLDER,
-            f"img_{i}.jpg"
-        )
+            img = requests.get(url, timeout=10)
 
-        success = download_image(
-            image_url,
-            file_path
-        )
+            if img.status_code != 200:
+                continue
 
-        if success:
-            print(f"Saved {file_path}")
+            content = img.content
 
-print("DONE")
+            # убираем дубликаты
+            img_hash = hashlib.md5(content).hexdigest()
+            if img_hash in seen_hashes:
+                continue
+            seen_hashes.add(img_hash)
+
+            # 🧹 фильтр качества изображения
+            if not is_good_image(content):
+                continue
+
+            # сохраняем
+            path = f"{folder}/{i}.jpg"
+            with open(path, "wb") as f:
+                f.write(content)
+
+            print("Saved", i)
+            i += 1
+
+        except Exception as e:
+            print("skip", i, e)
