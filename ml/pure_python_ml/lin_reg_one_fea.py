@@ -7,9 +7,9 @@ np.random.seed(42)
 true_w = 4
 true_b = 3
 x = np.random.rand(100)
-y = x * true_w + true_b + np.random.randn(100)
+y = x * true_w + true_b + np.random.rand(100)
 
-model = LrOneFea()
+model = LrOneFea(learning_rate=0.01, epochs=2000)
 model.fit(x, y)
 
 y_pred = model.predict(x)

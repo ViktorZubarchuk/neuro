@@ -23,7 +23,7 @@ df = pd.DataFrame({
     'price': price
     })
 
-model = LinReg()
+model = LinReg(learning_rate=0.01, epochs=1000)
 model.fit(x, price)
 
 pred = model.predict(x)

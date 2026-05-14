@@ -3,11 +3,11 @@ from statistics import mode
 
 
 class LinearRegressionOneFeature:
-    def __init__(self):
+    def __init__(self, learning_rate, epochs):
         self.w = np.random.rand()
         self.b = np.random.rand()
-        self.learning_rate = 0.01
-        self.epochs = 1000
+        self.learning_rate = learning_rate
+        self.epochs = epochs
     
     def predict(self, x):
         y_pred = x*self.w + self.b
@@ -29,12 +29,13 @@ class LinearRegressionOneFeature:
             self.w -= dw*self.learning_rate
             self.b -= db*self.learning_rate
             if i%100==0:
-                print(f"{i}: loss = {self.calc_mse(y, y_pred)}, w = {self.w}, b = {self.b}")
+                print(f"{i}: MSE = {self.calc_mse(y, y_pred)}, w = {self.w}, b = {self.b}")
 
 class LinearRegression:
-    def __init__(self):
-        self.learning_rate = 0.01
-        self.epochs = 1000
+    def __init__(self, learning_rate, epochs):
+        self.learning_rate = learning_rate
+        self.epochs = epochs
+
         self.mean = None
         self.std = None
     
@@ -134,69 +135,78 @@ class DesicionTree():
         self.min_samples_split = min_samples_split
         self.root = None
 
-    def gini(self, y):
-        classes, counts = np.unique(y, return_counts=True)
-        p = counts/len(y)
-        return 1 - np.sum(p**2)
-    
-    def best_split(self, X, y):
-        best_gini = 1
-        best_idx, best_thr = None, None
-        for idx in range(X.shape[1]):
-            thresholds = np.unique(X[:, idx])
-            for thr in thresholds:
-                left_mask = X[:, idx] <= thr
-                right_mask = X[:, idx] > thr
-                if len(y[left_mask]) == 0 or len(y[right_mask]) == 0:
-                    continue
-                gini_left = self.gini(y[left_mask])
-                gini_right = self.gini(y[right_mask])
-                gini_split = (len(y[left_mask])/len(y)) * gini_left + (len(y[right_mask])/len(y)) * gini_right
-                if gini_split < best_gini:
-                    best_gini = gini_split
-                    best_idx = idx
-                    best_thr = thr
-        return best_idx, best_thr
-    
-    def build_tree(self, X, y, depth=0):
-    # 1. Проверяем, все ли объекты одного класса
-        if len(np.unique(y)) == 1:
-            return Node(value=y[0])  # создаём лист
-
-        # 2. Проверяем ограничение по глубине
-        if self.max_depth is not None and depth >= self.max_depth:
-            return Node(value=np.bincount(y).argmax())  # лист с самым частым классом
-
-        # 3. Находим лучший сплит
-        idx, thr = self.best_split(X, y)
-        if idx is None:  # если делить нельзя
-            return Node(value=np.bincount(y).argmax())
-
-        # 4. Делим данные на левую и правую ветки
-        left_mask = X[:, idx] <= thr
-        right_mask = X[:, idx] > thr
-
-        # 5. Рекурсивно строим левое и правое поддеревья
-        left = self.build_tree(X[left_mask], y[left_mask], depth + 1)
-        right = self.build_tree(X[right_mask], y[right_mask], depth + 1)
-
-        # 6. Возвращаем узел с поддеревьями
-        return Node(feature_idx=idx, threshold=thr, left=left, right=right)
-
-    def fit(self, X, y, max_depth=None):
-        self.root = self.build_tree(X, y, depth=0)
-
     def predict_single(self, x, node):
-        if node.value is not None:
+        if node.value is not None: 
             return node.value
-        if x[node.feature_idx] <= node.threshold:
+        feature_value = x[node.feature_idx]
+        if feature_value < node.threshold: 
             return self.predict_single(x, node.left)
-        else:
+        else: 
             return self.predict_single(x, node.right)
+        
+    def gini(self, y):
+        classes = np.unique(y)
+        res = 1
+        for cls in classes:
+            p = np.sum(y==cls)/len(y)
+            res -= p**2
+        return res
+    
+    def split(self, X_colomn, threshold):
+        left_idxs = np.argwhere(X_colomn < threshold).flatten()
+        right_idxs = np.argwhere(X_colomn >= threshold).flatten()
+        return left_idxs, right_idxs
+    
+    def split_gini(self, y, X_colomn, threshold):
+        left_idxs, right_idxs = self.split(X_colomn, threshold)
+        if len(left_idxs) == 0 or len(right_idxs) == 0:
+            return 999
+        left_gini = self.gini(y[left_idxs])
+        right_gini = self.gini(y[right_idxs])
+        n = len(y)
+        weighted_gini = len(left_idxs) / n * left_gini + len(right_idxs) / n * right_gini
+        return weighted_gini
+
+    def best_split(self, X, y):
+        best_gini = 999
+        best_feature = None
+        best_threshold = None
+        n_features = X.shape[1]
+        for feature_idx in range(n_features):
+            n_threshold = np.unique(X[:, feature_idx])
+            for thr in n_threshold:
+                split_gini = self.split_gini(y, X[:, feature_idx], thr)
+                if split_gini < best_gini:
+                    best_gini = split_gini
+                    best_feature = feature_idx
+                    best_threshold = thr
+        return best_feature, best_threshold
+    
+    def build_tree(self, X, y):
+        if len(np.unique(y)) == 1:
+            return Node(value = y[0]) 
+        feature_idx, threshold = self.best_split(X, y)
+        left_idxs, right_idxs = self.split(X[:, feature_idx], threshold)
+        X_left = X[left_idxs]
+        y_left = y[left_idxs]
+        X_right = X[right_idxs]
+        y_right = y[right_idxs]
+        left_tree = self.build_tree(X_left, y_left)
+        right_tree = self.build_tree(X_right, y_right)
+        return Node(
+            feature_idx=feature_idx,
+            threshold=threshold,
+            left=left_tree,
+            right=right_tree)
+    
+    def fit(self, X, y):
+        self.root = self.build_tree(X, y)
 
     def predict(self, X):
-        return np.array([self.predict_single(x, self.root) for x in X])
-    
+        predictions = [self.predict_single(x, self.root) for x in X]
+        return np.array(predictions)
+
+
 class Node:
     def __init__(self, feature_idx=None, threshold=None, left=None, right=None, value=None):
         self.feature_idx = feature_idx  # индекс признака, по которому делим

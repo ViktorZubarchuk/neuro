@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from models_utils import DesicionTree
+from models_utils import Node
+
 
 
 # рост (см), вес (кг)
