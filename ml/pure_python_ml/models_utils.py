@@ -1,6 +1,5 @@
 import numpy as np
-from statistics import mode  
-
+from scipy.stats import mode
 
 class LinearRegressionOneFeature:
     def __init__(self, learning_rate, epochs):
@@ -130,9 +129,9 @@ class KNN():
         return mode(neighbors)
     
 class DesicionTree():
-    def __init__(self, max_depth=None, min_samples_split=2):
-        self.max_depth = max_depth
-        self.min_samples_split = min_samples_split
+    def __init__(self):
+        self.max_depth = None
+        self.min_samples_split = None
         self.root = None
 
     def predict_single(self, x, node):
@@ -216,6 +215,54 @@ class Node:
         self.value = value              # если это лист, здесь класс
     
 
+class RandomForest():
+    def __init__(self, n_trees):
+        self.n_trees = n_trees
+        self.trees = []
+
+    def bootstrap(self, X, y):
+        X_sample = []
+        y_sample = []
+        n = len(X)
+        for i in range(n):
+            random_idx = np.random.randint(0,n)
+            X_sample.append(X[random_idx]) 
+            y_sample.append(y[random_idx])
+        X_sample = np.array(X_sample)
+        y_sample = np.array(y_sample)
+        return X_sample, y_sample
+    
+    def build_tree(self, X, y):
+        if len(np.unique(y)) == 1:
+            return Node(value = y[0]) 
+        feature_idx, threshold = self.best_split(X, y)
+        left_idxs, right_idxs = self.split(X[:, feature_idx], threshold)
+        X_left = X[left_idxs]
+        y_left = y[left_idxs]
+        X_right = X[right_idxs]
+        y_right = y[right_idxs]
+        left_tree = self.build_tree(X_left, y_left)
+        right_tree = self.build_tree(X_right, y_right)
+        return Node(
+            feature_idx=feature_idx,
+            threshold=threshold,
+            left=left_tree,
+            right=right_tree)
+    
+    def fit(self, X, y):
+        for i in range(self.n_trees):
+            X_sample, y_sample = self.bootstrap(X, y)
+            tree = DesicionTree()
+            tree.fit(X_sample, y_sample)
+            self.trees.append(tree)
+
+    def predict(self, X):
+        preds = np.array(tree.predict(X) for tree in self.trees)
+        preds = preds.T
+        return mode(preds, axis=1, keepdims=False).mode 
+
+
+            
     
     
 

@@ -1,7 +1,5 @@
+from models_utils import RandomForest
 import numpy as np
-import matplotlib.pyplot as plt
-from models_utils import DesicionTree
-from models_utils import Node
 
 # рост (см), вес (кг)
 X_train = np.array([
@@ -32,8 +30,8 @@ X_test = np.array([
     [170, 60],   # не полный
     [175, 95]    # полный
 ])
-model = DesicionTree()
 
+model = RandomForest(5)
 model.fit(X_train, y_train)
 
 pred = model.predict(X_train)
